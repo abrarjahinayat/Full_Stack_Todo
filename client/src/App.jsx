@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Check, X } from 'lucide-react';
-import { useEffect } from 'react';
 import axios from 'axios';
+import toast, { Toaster } from 'react-hot-toast';
 
 export default function App() {
   const [todos, setTodos] = useState([]);
@@ -11,69 +11,99 @@ export default function App() {
   const [editName, setEditName] = useState('');
   const [editAge, setEditAge] = useState('');
 
-  function getalltodos() { 
-    axios.get('http://localhost:3000/getalltodos')
-    .then((res) => {
-    setTodos(res.data.data);
-    })
-    .catch((err) => {
-      console.error('Error fetching todos:', err);
-    });
-   }
-
-
+  // ✅ Fetch all todos
+  function getalltodos() {
+    axios
+      .get('http://localhost:3000/getalltodos')
+      .then((res) => {
+        setTodos(res.data.data);
+      })
+      .catch((err) => {
+        console.error('Error fetching todos:', err);
+      });
+  }
 
   useEffect(() => {
-    getalltodos([]);
-  }, []);
+    getalltodos();
+  }, []); // ✅ run only once when component mounts
 
+  // ✅ Add new todo
   const addTodo = () => {
     if (name.trim() && age.trim()) {
-      const newTodo = {
-        id: Date.now(),
-        name: name.trim(),
-        age: parseInt(age),
-        completed: false
-      };
-      setTodos([...todos, newTodo]);
-      setName('');
-      setAge('');
+      axios
+        .post('http://localhost:3000/addtodo', {
+          name: name.trim(),
+          age: parseInt(age),
+        })
+        .then(() => {
+          toast.success('Successfully added!');
+          getalltodos(); // refresh list
+        })
+        .catch((err) => {
+          console.error('Error adding todo:', err);
+        });
     }
+    setName('');
+    setAge('');
   };
 
+  // ✅ Delete todo
   const deleteTodo = (id) => {
-    setTodos(todos.filter(todo => todo.id !== id));
+    axios
+      .delete(`http://localhost:3000/deletetodo/${id}`)
+      .then(() => {
+        toast.success('Successfully deleted!');
+        getalltodos(); // refresh list
+      })
+      .catch((err) => {
+        console.error('Error deleting todo:', err);
+      });
   };
 
+  // ✅ Toggle complete (local only, not saved in DB)
   const toggleComplete = (id) => {
-    setTodos(todos.map(todo => 
-      todo.id === id ? { ...todo, completed: !todo.completed } : todo
-    ));
+    setTodos(
+      todos.map((todo) =>
+        todo._id === id ? { ...todo, completed: !todo.completed } : todo
+      )
+    );
   };
 
+  // ✅ Start edit
   const startEdit = (todo) => {
-    setEditingId(todo.id);
+    setEditingId(todo._id);
     setEditName(todo.name);
-    setEditAge(todo.age.toString());
+    setEditAge(todo.age);
   };
 
+  // ✅ Save edit
   const saveEdit = () => {
-    if (editName.trim() && editAge.trim()) {
-      setTodos(todos.map(todo => 
-        todo.id === editingId 
-          ? { ...todo, name: editName.trim(), age: parseInt(editAge) }
-          : todo
-      ));
-      cancelEdit();
-    }
+    axios
+      .patch(`http://localhost:3000/updatetodo/${editingId}`, {
+        name: editName.trim(),
+        age: parseInt(editAge),
+      })
+      .then(() => {
+        toast.success('Successfully updated!');
+        getalltodos(); // refresh list
+      })
+      .catch((err) => {
+        console.error('Error updating todo:', err);
+      });
+
+    setEditingId(null);
+    setEditName('');
+    setEditAge('');
   };
 
+  // ✅ Cancel edit
   const cancelEdit = () => {
     setEditingId(null);
     setEditName('');
     setEditAge('');
   };
 
+  // ✅ Handle Enter key
   const handleKeyPress = (e, action) => {
     if (e.key === 'Enter') {
       action();
@@ -85,13 +115,19 @@ export default function App() {
       <h1 className="text-3xl font-bold text-gray-800 mb-8 text-center">
         Todo List
       </h1>
-      
+      <Toaster />
+
       {/* Add Todo Form */}
       <div className="mb-8 p-6 bg-gray-50 rounded-lg">
-        <h2 className="text-xl font-semibold text-gray-700 mb-4">Add New Person</h2>
+        <h2 className="text-xl font-semibold text-gray-700 mb-4">
+          Add New Person
+        </h2>
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1">
-            <label htmlFor="name" className="block text-sm font-medium text-gray-600 mb-1">
+            <label
+              htmlFor="name"
+              className="block text-sm font-medium text-gray-600 mb-1"
+            >
               Name
             </label>
             <input
@@ -105,7 +141,10 @@ export default function App() {
             />
           </div>
           <div className="flex-1">
-            <label htmlFor="age" className="block text-sm font-medium text-gray-600 mb-1">
+            <label
+              htmlFor="age"
+              className="block text-sm font-medium text-gray-600 mb-1"
+            >
               Age
             </label>
             <input
@@ -142,14 +181,14 @@ export default function App() {
         <div className="space-y-3">
           {todos.map((todo) => (
             <div
-              key={todo.id}
+              key={todo._id}
               className={`p-4 rounded-lg border-2 transition ${
                 todo.completed
                   ? 'bg-green-50 border-green-200'
                   : 'bg-white border-gray-200 hover:border-gray-300'
               }`}
             >
-              {editingId === todo.id ? (
+              {editingId === todo._id ? (
                 <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
                   <input
                     type="text"
@@ -186,7 +225,7 @@ export default function App() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <button
-                      onClick={() => toggleComplete(todo.id)}
+                      onClick={() => toggleComplete(todo._id)}
                       className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${
                         todo.completed
                           ? 'bg-green-500 border-green-500 text-white'
@@ -195,9 +234,15 @@ export default function App() {
                     >
                       {todo.completed && <Check size={14} />}
                     </button>
-                    <div className={`${todo.completed ? 'line-through text-gray-500' : ''}`}>
+                    <div
+                      className={`${
+                        todo.completed ? 'line-through text-gray-500' : ''
+                      }`}
+                    >
                       <span className="font-medium">{todo.name}</span>
-                      <span className="text-gray-600 ml-2">({todo.age} years old)</span>
+                      <span className="text-gray-600 ml-2">
+                        ({todo.age} years old)
+                      </span>
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -208,7 +253,7 @@ export default function App() {
                       <Edit2 size={16} />
                     </button>
                     <button
-                      onClick={() => deleteTodo(todo.id)}
+                      onClick={() => deleteTodo(todo._id)}
                       className="p-2 text-red-600 hover:bg-red-100 rounded transition"
                     >
                       <Trash2 size={16} />
@@ -226,8 +271,8 @@ export default function App() {
         <div className="mt-8 p-4 bg-gray-100 rounded-lg">
           <div className="flex justify-between text-sm text-gray-600">
             <span>Total: {todos.length}</span>
-            <span>Completed: {todos.filter(t => t.completed).length}</span>
-            <span>Remaining: {todos.filter(t => !t.completed).length}</span>
+            <span>Completed: {todos.filter((t) => t.completed).length}</span>
+            <span>Remaining: {todos.filter((t) => !t.completed).length}</span>
           </div>
         </div>
       )}
