@@ -74,9 +74,9 @@ app.patch("/updatetodo/:id", async (req, res)=>{
     try {
         
         let {id} = req.params;
-        let {name} = req.body
+        let {name,age} = req.body
 
-        let updatetodo = await todolist.findOneAndUpdate({_id: id},{name},{new:true });
+        let updatetodo = await todolist.findOneAndUpdate({_id: id},{name,age},{new:true });
 
         return res.status(200).json({
             success:true , 
